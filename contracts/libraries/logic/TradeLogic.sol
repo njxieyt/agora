@@ -1,0 +1,226 @@
+// SPDX-License-Identifier: BUSL-1.1
+pragma solidity ^0.8.17;
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "../../Merchandise.sol";
+import "../constant/Errors.sol";
+import "../constant/States.sol";
+import {Calculate} from "../utils/Calculate.sol";
+import {AgoraStorage} from "../../AgoraStorage.sol";
+import {ILogisticsLookup} from "../../interfaces/ILogisticsLookup.sol";
+
+library TradeLogic {
+    using SafeMath for uint256;
+
+    event Sell(uint256 indexed tokenId, address indexed seller, uint256 fee);
+
+    function sellProcess(
+        uint256 tokenId,
+        uint256 price,
+        uint16 amount,
+        uint16 marginRate,
+        uint16 feeRate,
+        string calldata newUri,
+        Merchandise mToken,
+        mapping(uint256 => AgoraStorage.MerchandiseInfo)
+            storage merchandiseInfo,
+        mapping(address => AgoraStorage.UserInfo) storage users
+    ) external {
+        require(bytes(newUri).length > 0, Errors.URI_NOT_DEFINED);
+
+        // Get margin amount & fee
+        AgoraStorage.UserInfo storage userInfo = users[msg.sender];
+        (uint256 margin, uint256 fee) = Calculate.marginPrice(
+            price.mul(amount),
+            userInfo.marginRate == 0 ? marginRate : userInfo.marginRate,
+            userInfo.feeRate == 0 ? feeRate : userInfo.feeRate
+        );
+        require(msg.value >= margin + fee, Errors.INSUFFICIENT_MARGIN);
+
+        // Record margin of this merchandise amount
+        merchandiseInfo[tokenId].margin += margin;
+        // Record price of this merchandise
+        merchandiseInfo[tokenId].price = price;
+        // Record owner of this merchandise
+        merchandiseInfo[tokenId].seller = msg.sender;
+        // mint
+        mToken.mint(msg.sender, tokenId, amount, newUri);
+
+        emit Sell(tokenId, msg.sender, fee);
+    }
+
+    function buyProcess(
+        uint256 tokenId,
+        uint16 amount,
+        bytes32 deliveryAddress,
+        mapping(uint256 => AgoraStorage.MerchandiseInfo)
+            storage merchandiseInfo,
+        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+            storage logisticsInfo
+    ) external {
+        // Amount must be greater than 0'
+        require(amount != 0, Errors.INVALID_AMOUNT);
+        // Is enough price
+        uint256 price = merchandiseInfo[tokenId].price;
+        require(msg.value >= price * amount, Errors.NOT_ENOUGH_ETH);
+
+        // Add new logisticsInfo
+        AgoraStorage.Logistics memory logistics;
+        logistics.amount = amount;
+        logistics.deliveryAddress = deliveryAddress;
+        logistics.orderTime = block.number;
+        logistics.price = price;
+        logisticsInfo[tokenId][msg.sender] = logistics;
+    }
+
+    /**
+        When logistics delivered update complete time
+     */
+    function deliveredProcess(
+        uint256 tokenId,
+        address to,
+        ILogisticsLookup logisticsLookup,
+        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+            storage logisticsInfo
+    ) external {
+        mapping(address => AgoraStorage.Logistics)
+            storage logisticsOfToken = logisticsInfo[tokenId];
+        uint16 amount = logisticsOfToken[to].amount;
+        require(amount > 0, Errors.NO_ORDER);
+
+        // Lookup logistics state
+        string memory logisticsNo = logisticsOfToken[to].logisticsNo;
+        require(
+            logisticsLookup.getLogisticsState(logisticsNo) ==
+                States.LOGISTICS_DELIVERED,
+            Errors.ORDER_UNCOMPLETED
+        );
+
+        // Update logistics info
+        logisticsOfToken[to].completeTime = block.number;
+    }
+
+    /**
+    Condition:1.delivered 2.complete time more than 7 days 3.no returned
+     */
+    function settlementProcess(
+        uint256 tokenId,
+        address payable to,
+        Merchandise mToken,
+        mapping(uint256 => AgoraStorage.MerchandiseInfo)
+            storage merchandiseInfo,
+        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+            storage logisticsInfo
+    ) external {
+        mapping(address => AgoraStorage.Logistics)
+            storage logisticsOfToken = logisticsInfo[tokenId];
+        uint16 amount = logisticsOfToken[to].amount;
+        require(amount > 0, Errors.NO_ORDER);
+
+        // Is complete time more then 7 days
+        require(
+            block.number >
+                logisticsOfToken[to].completeTime + States.DAYS_7_BLOCK_NUMBER,
+            Errors.NOT_ENOUGH_TIME
+        );
+
+        // Is returned
+        require(
+            logisticsOfToken[to].returnTime == 0,
+            Errors.MERCHANDISE_RETURNED
+        );
+
+        // Get Merchandise price and seller
+        AgoraStorage.MerchandiseInfo
+            storage tokenOfMerchandise = merchandiseInfo[tokenId];
+        address payable seller = payable(tokenOfMerchandise.seller);
+
+        // transfer mToken to buyer
+        mToken.safeTransferFrom(seller, to, tokenId, amount, "");
+
+        // send ETH to seller
+        seller.transfer(logisticsOfToken[to].price * amount);
+    }
+
+    function releaseMarginProcess(
+        uint256 tokenId,
+        uint16 marginRate,
+        uint16 feeRate,
+        Merchandise mToken,
+        mapping(uint256 => AgoraStorage.MerchandiseInfo)
+            storage merchandiseInfo,
+        mapping(address => AgoraStorage.UserInfo) storage users
+    ) external {
+        // user deposit margin
+        AgoraStorage.MerchandiseInfo
+            storage tokenOfMerchandise = merchandiseInfo[tokenId];
+        address seller = tokenOfMerchandise.seller;
+        require(msg.sender == seller, Errors.INVALID_MARGIN_USER);
+
+        // real margin
+        AgoraStorage.UserInfo storage userInfo = users[seller];
+        (uint256 realTimeMargin, ) = Calculate.marginPrice(
+            tokenOfMerchandise.price.mul(mToken.balanceOf(seller, tokenId)),
+            userInfo.marginRate == 0 ? marginRate : userInfo.marginRate,
+            userInfo.feeRate == 0 ? feeRate : userInfo.feeRate
+        );
+        require(tokenOfMerchandise.margin > realTimeMargin, Errors.MARGIN_BELOW_THRESHOLD);
+        
+        // transfer excess margin
+        payable(seller).transfer(tokenOfMerchandise.margin - realTimeMargin);
+    }
+
+    function refundProcess(
+        uint256 tokenId,
+        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+            storage logisticsInfo
+    ) external {
+        mapping(address => AgoraStorage.Logistics)
+            storage logisticsOfToken = logisticsInfo[tokenId];
+        address buyer = msg.sender;
+        require(logisticsOfToken[buyer].amount > 0, Errors.NO_ORDER);
+
+        require(
+            bytes(logisticsOfToken[buyer].logisticsNo).length < 1,
+            Errors.LOGISTICS_PROCESSED
+        );
+
+        payable(msg.sender).transfer(logisticsOfToken[buyer].price);
+    }
+
+    function returnMerchandiseProcess(
+        uint256 tokenId,
+        uint16 amount,
+        string calldata logisticsNo,
+        bytes32 deliveryAddress,
+        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+            storage logisticsInfo,
+        mapping(uint256 => AgoraStorage.MerchandiseInfo) storage merchandiseInfo
+    ) external {
+        AgoraStorage.Logistics storage buyerLogistics = logisticsInfo[tokenId][
+            msg.sender
+        ];
+        // Check if order completed
+        require(buyerLogistics.completeTime > 0, Errors.ORDER_UNCOMPLETED);
+
+        // Check if expired, complete time less than 7 days
+        require(
+            block.number <=
+                buyerLogistics.completeTime + States.DAYS_7_BLOCK_NUMBER,
+            Errors.RETURN_TIME_EXPIRED
+        );
+
+        // Check return amount
+        require(buyerLogistics.amount > amount, Errors.AMOUNT_EXCEEDED);
+
+        // Update logisticsInfo
+        buyerLogistics.returnTime = block.number;
+        // Add new logisticsInfo,buyer->seller
+        AgoraStorage.Logistics memory logistics;
+        logistics.amount = amount;
+        logistics.logisticsNo = logisticsNo;
+        logistics.deliveryAddress = deliveryAddress;
+        logistics.orderTime = block.number;
+        logistics.price = buyerLogistics.price;
+        logisticsInfo[tokenId][merchandiseInfo[tokenId].seller] = logistics;
+    }
+}

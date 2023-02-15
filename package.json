@@ -1,0 +1,19 @@
+{
+  "name": "agora",
+  "version": "0.0.1",
+  "description": "a decentralized commodity trading marketplace",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "BUSL-1.1",
+  "dependencies": {
+    "@openzeppelin/contracts": "^4.8.1",
+    "@openzeppelin/contracts-upgradeable": "^4.8.1"
+  },
+  "devDependencies": {
+    "@openzeppelin/truffle-upgrades": "^1.17.0"
+  }
+}
