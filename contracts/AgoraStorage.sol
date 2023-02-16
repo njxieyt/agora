@@ -10,9 +10,9 @@ abstract contract AgoraStorage {
     // Default seller's fee percentage (Unit: percentage with 2 decimal)
     uint16 public feeRate;
     //address logisticsLookupAddress;
-    ILogisticsLookup logisticsLookup;
+    ILogisticsLookup public logisticsLookup;
     // Auto increase token id;
-    uint256 internal _currentTokenId;
+    uint256 public currentTokenId;
 
     // Map of users address and their info
     mapping(address => UserInfo) public users;
@@ -41,7 +41,7 @@ abstract contract AgoraStorage {
     struct Logistics {
         uint16 amount;
         // at time price
-        uint256 price;        
+        uint256 price;
         string logisticsNo;
         // hash the delivery address by keccak256
         bytes32 deliveryAddress;
@@ -51,6 +51,5 @@ abstract contract AgoraStorage {
         uint256 completeTime;
         // block number
         uint256 returnTime;
-        
     }
 }

@@ -17,29 +17,28 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     {
         mToken = merchandise;
         logisticsLookup = lookup;
-        // Unit: percentage with 2 decimal(default 0.1%)
-        marginRate = 10;
+        // Unit: % with two decimal places(default 10%)
+        marginRate = 1000;
+        // Unit: % with two decimal places(default 0.1%)
+        feeRate = 10;
     }
 
     function sell(
         uint16 amount,
         uint256 uintPrice,
         string calldata newUri
-    ) external payable returns (uint256) {
+    ) external payable {
         TradeLogic.sellProcess(
-            ++_currentTokenId,
+            ++currentTokenId,
             uintPrice,
-            amount,            
+            amount,
             marginRate,
             feeRate,
-            newUri,            
+            newUri,
             mToken,
             merchandiseInfo,
             users
         );
-        // Contract management mToken 
-        mToken.setApprovalForAll(address(this), true);
-        return _currentTokenId;
     }
 
     function buy(
@@ -124,7 +123,7 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         feeRate = newFeeRate;
     }
 
-    function getFeeRate() external view returns(uint16) {
+    function getFeeRate() external view returns (uint16) {
         return feeRate;
     }
 
@@ -145,7 +144,10 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     /**
         @dev management:setup fee rate on user
      */
-    function setUserFeeRate(address user, uint16 newFeeRate) external onlyOwner {
+    function setUserFeeRate(address user, uint16 newFeeRate)
+        external
+        onlyOwner
+    {
         users[user].feeRate = newFeeRate;
     }
 

@@ -4,13 +4,16 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 library Calculate {
     using SafeMath for uint256;
+    uint16 public constant PRECISION = 10**2;
 
     function marginPrice(
         uint256 price,
         uint16 marginRate,
         uint16 feeRate
     ) external pure returns (uint256, uint256) {
-        uint256 marginRaw = price.mul(marginRate);
-        return (marginRaw.div(10000), marginRaw.mul(feeRate).div(10000));
+        return (
+            price.mul(marginRate).div(PRECISION).div(100),
+            price.mul(feeRate).div(PRECISION).div(100)
+        );
     }
 }
