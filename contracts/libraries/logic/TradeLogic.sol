@@ -12,6 +12,12 @@ library TradeLogic {
     using SafeMath for uint256;
 
     event Sell(uint256 indexed tokenId, address indexed seller, uint256 fee);
+    event Buy(uint256 indexed tokenId, address indexed buyer);
+    event Shipped(
+        uint256 indexed tokenId,
+        address indexed seller,
+        address buyer
+    );
 
     function sellProcess(
         uint256 tokenId,
@@ -70,12 +76,39 @@ library TradeLogic {
         logistics.orderTime = block.number;
         logistics.price = price;
         logisticsInfo[tokenId][msg.sender] = logistics;
+
+        emit Buy(tokenId, msg.sender);
+    }
+
+    /**
+        Seller shipped
+     */
+    function shipProcess(
+        uint256 tokenId,
+        address to,
+        string calldata logisticsNo,
+        Merchandise mToken,
+        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+            storage logisticsInfo
+    ) external {
+        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
+        // Valid order
+        require(logistics.orderTime > 0, Errors.NO_ORDER);
+
+        // Is owner of tokenId
+        uint256 amount = mToken.balanceOf(msg.sender, tokenId);
+        require(amount >= logistics.amount, Errors.INSUFFICIENT_AMOUNT);
+
+        // Update logistics info
+        logistics.logisticsNo = logisticsNo;
+
+        emit Shipped(tokenId, msg.sender, to);
     }
 
     /**
         When logistics delivered update complete time
      */
-    function deliveredProcess(
+    function deliverProcess(
         uint256 tokenId,
         address to,
         ILogisticsLookup logisticsLookup,
@@ -102,43 +135,39 @@ library TradeLogic {
     /**
     Condition:1.delivered 2.complete time more than 7 days 3.no returned
      */
-    function settlementProcess(
+    function settleProcess(
         uint256 tokenId,
-        address payable to,
+        address to,
         Merchandise mToken,
-        mapping(uint256 => AgoraStorage.MerchandiseInfo)
-            storage merchandiseInfo,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
             storage logisticsInfo
     ) external {
-        mapping(address => AgoraStorage.Logistics)
-            storage logisticsOfToken = logisticsInfo[tokenId];
-        uint16 amount = logisticsOfToken[to].amount;
+        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
+        uint16 amount = logistics.amount;
         require(amount > 0, Errors.NO_ORDER);
 
         // Is complete time more then 7 days
         require(
-            block.number >
-                logisticsOfToken[to].completeTime + States.DAYS_7_BLOCK_NUMBER,
+            block.number > logistics.completeTime + States.DAYS_7_BLOCK_NUMBER,
             Errors.NOT_ENOUGH_TIME
         );
 
         // Is returned
-        require(
-            logisticsOfToken[to].returnTime == 0,
-            Errors.MERCHANDISE_RETURNED
-        );
+        require(logistics.returnTime == 0, Errors.MERCHANDISE_RETURNED);
 
-        // Get Merchandise price and seller
-        AgoraStorage.MerchandiseInfo
-            storage tokenOfMerchandise = merchandiseInfo[tokenId];
-        address payable seller = payable(tokenOfMerchandise.seller);
+        // Settlement partner cannot be oneself
+        require(msg.sender != to, Errors.SETTLEMENT_PARTNER_IS_ONESELF);
 
-        // transfer mToken to buyer
+        // Is owner of tokenId
+        uint256 amountOfToken = mToken.balanceOf(msg.sender, tokenId);
+        require(amountOfToken >= amount, Errors.INSUFFICIENT_AMOUNT);
+        address payable seller = payable(msg.sender);
+
+        // Transfer mToken to buyer
         mToken.safeTransferFrom(seller, to, tokenId, amount, "");
 
-        // send ETH to seller
-        seller.transfer(logisticsOfToken[to].price * amount);
+        // Send ETH to seller
+        seller.transfer(logistics.price * amount);
     }
 
     function releaseMarginProcess(
@@ -163,8 +192,11 @@ library TradeLogic {
             userInfo.marginRate == 0 ? marginRate : userInfo.marginRate,
             userInfo.feeRate == 0 ? feeRate : userInfo.feeRate
         );
-        require(tokenOfMerchandise.margin > realTimeMargin, Errors.MARGIN_BELOW_THRESHOLD);
-        
+        require(
+            tokenOfMerchandise.margin > realTimeMargin,
+            Errors.MARGIN_BELOW_THRESHOLD
+        );
+
         // transfer excess margin
         payable(seller).transfer(tokenOfMerchandise.margin - realTimeMargin);
     }

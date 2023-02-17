@@ -15,4 +15,6 @@ library Errors {
     string public constant NOT_ENOUGH_TIME = '11';
     string public constant RETURN_TIME_EXPIRED = '12';
     string public constant MERCHANDISE_RETURNED = '13';
+    string public constant INSUFFICIENT_AMOUNT = '14';
+    string public constant SETTLEMENT_PARTNER_IS_ONESELF = '15';
 }

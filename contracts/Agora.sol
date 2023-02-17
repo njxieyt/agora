@@ -55,8 +55,22 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         );
     }
 
-    function delivered(uint256 tokenId, address to) external {
-        TradeLogic.deliveredProcess(
+    function ship(
+        uint256 tokenId,
+        address to,
+        string calldata logisticsNo
+    ) external {
+        TradeLogic.shipProcess(
+            tokenId,
+            to,
+            logisticsNo,
+            mToken,
+            logisticsInfo
+        );
+    }
+
+    function deliver(uint256 tokenId, address to) external {
+        TradeLogic.deliverProcess(
             tokenId,
             to,
             logisticsLookup,
@@ -64,12 +78,11 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         );
     }
 
-    function settlement(uint256 tokenId, address to) external {
-        TradeLogic.settlementProcess(
+    function settle(uint256 tokenId, address to) external {
+        TradeLogic.settleProcess(
             tokenId,
-            payable(to),
+            to,
             mToken,
-            merchandiseInfo,
             logisticsInfo
         );
     }
