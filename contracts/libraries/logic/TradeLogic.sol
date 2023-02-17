@@ -140,7 +140,8 @@ library TradeLogic {
         address to,
         Merchandise mToken,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
-            storage logisticsInfo
+            storage logisticsInfo,
+        uint256 returnPeriod
     ) external {
         AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
         uint16 amount = logistics.amount;
@@ -148,7 +149,7 @@ library TradeLogic {
 
         // Is complete time more then 7 days
         require(
-            block.number > logistics.completeTime + States.DAYS_7_BLOCK_NUMBER,
+            block.number > logistics.completeTime + returnPeriod,
             Errors.NOT_ENOUGH_TIME
         );
 
@@ -226,7 +227,8 @@ library TradeLogic {
         bytes32 deliveryAddress,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
             storage logisticsInfo,
-        mapping(uint256 => AgoraStorage.MerchandiseInfo) storage merchandiseInfo
+        mapping(uint256 => AgoraStorage.MerchandiseInfo) storage merchandiseInfo,
+        uint256 returnPeriod
     ) external {
         AgoraStorage.Logistics storage buyerLogistics = logisticsInfo[tokenId][
             msg.sender
@@ -237,7 +239,7 @@ library TradeLogic {
         // Check if expired, complete time less than 7 days
         require(
             block.number <=
-                buyerLogistics.completeTime + States.DAYS_7_BLOCK_NUMBER,
+                buyerLogistics.completeTime + returnPeriod,
             Errors.RETURN_TIME_EXPIRED
         );
 

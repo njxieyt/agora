@@ -13,6 +13,8 @@ abstract contract AgoraStorage {
     ILogisticsLookup public logisticsLookup;
     // Auto increase token id;
     uint256 public currentTokenId;
+    // The maximum period for return
+    uint256 public returnPeriod;
 
     // Map of users address and their info
     mapping(address => UserInfo) public users;

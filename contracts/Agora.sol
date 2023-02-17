@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./AgoraStorage.sol";
 import {TradeLogic} from "./libraries/logic/TradeLogic.sol";
 import {Errors} from "./libraries/constant/Errors.sol";
+import {States} from "./libraries/constant/States.sol";
 
 contract Agora is AgoraStorage, Initializable, Ownable {
     using SafeMath for uint256;
@@ -21,6 +22,8 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         marginRate = 1000;
         // Unit: % with two decimal places(default 0.1%)
         feeRate = 10;
+        // 7 days is the default return period
+        returnPeriod = States.DAYS_7_BLOCK_NUMBER;
     }
 
     function sell(
@@ -60,22 +63,11 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         address to,
         string calldata logisticsNo
     ) external {
-        TradeLogic.shipProcess(
-            tokenId,
-            to,
-            logisticsNo,
-            mToken,
-            logisticsInfo
-        );
+        TradeLogic.shipProcess(tokenId, to, logisticsNo, mToken, logisticsInfo);
     }
 
     function deliver(uint256 tokenId, address to) external {
-        TradeLogic.deliverProcess(
-            tokenId,
-            to,
-            logisticsLookup,
-            logisticsInfo
-        );
+        TradeLogic.deliverProcess(tokenId, to, logisticsLookup, logisticsInfo);
     }
 
     function settle(uint256 tokenId, address to) external {
@@ -83,7 +75,8 @@ contract Agora is AgoraStorage, Initializable, Ownable {
             tokenId,
             to,
             mToken,
-            logisticsInfo
+            logisticsInfo,
+            returnPeriod
         );
     }
 
@@ -114,7 +107,8 @@ contract Agora is AgoraStorage, Initializable, Ownable {
             logisticsNo,
             deliveryAddress,
             logisticsInfo,
-            merchandiseInfo
+            merchandiseInfo,
+            returnPeriod
         );
     }
 
@@ -130,7 +124,7 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     /**
-        management:setup global fee rate
+        @dev management:setup global fee rate
      */
     function setFeeRate(uint16 newFeeRate) external onlyOwner {
         feeRate = newFeeRate;
@@ -166,5 +160,16 @@ contract Agora is AgoraStorage, Initializable, Ownable {
 
     function getUserFeeRate(address user) external view returns (uint16) {
         return users[user].feeRate;
+    }
+
+    /**
+        @dev management:Set the return period time
+     */
+    function setReturnPeriod(uint256 blockNumber) external onlyOwner {
+        returnPeriod = blockNumber;
+    }
+
+    function getReturnPeriod() external view returns (uint256) {
+        return returnPeriod;
     }
 }
