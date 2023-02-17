@@ -1,4 +1,3 @@
-const BN = require('bn.js');
 const Agora = artifacts.require('Agora');
 const Merchandise = artifacts.require('Merchandise');
 const Calculate = artifacts.require('Calculate');
@@ -26,8 +25,12 @@ contract('Agora', (accounts) => {
         merchandise = await Merchandise.new();
         calculate = await Calculate.new();
         logisticsLookup = await ILogisticsLookup.at(ILogisticsLookupAddress);
+        // Set owner of Merchandise is Agora contract
         await merchandise.transferOwnership(agora.address);
+        // Seller approval to management items
         await merchandise.setApprovalForAll(agora.address, true, { from: seller });
+        // Set item logistics state to delivered
+        logisticsLookup.setLogisticsState(web3.utils.keccak256(logisticsNo), '2');
     });
 
     it('Initialize', async () => {
@@ -49,6 +52,12 @@ contract('Agora', (accounts) => {
         const feeRate = await agora.getFeeRate();
         assert.equal(feeRate.toString(), rate.toString());
     });
+
+    it('Set return period to 0 days', async () => {
+        await agora.setReturnPeriod('0');
+        const blocknumber = await agora.getReturnPeriod();
+        assert.equal(blocknumber.toString(), '0');
+    })
 
     it('Calculate margin price', async () => {
         let marginPrice, fee;
@@ -95,8 +104,6 @@ contract('Agora', (accounts) => {
     })
 
     it('Item was delivered', async () => {
-        // Mock logistics state
-        logisticsLookup.setLogisticsState(web3.utils.keccak256(logisticsNo), '2');
         // Set item delivered
         await agora.deliver(tokenId, buyer);
         // Check logistics info
