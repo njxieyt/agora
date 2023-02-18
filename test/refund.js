@@ -68,26 +68,26 @@ contract('Refund', (accounts) => {
     });
 
     it('Buyer wants a refund', async () => {
-        const preBalance = await web3.eth.getBalance(buyer);
+        const balanceBefore = await web3.eth.getBalance(buyer);
         await agora.refund(tokenId, { from: buyer });
 
-        const afterBalance = await web3.eth.getBalance(buyer);
+        const balanceAfter = await web3.eth.getBalance(buyer);
 
-        let b1 = new BN(preBalance);
-        let b2 = new BN(afterBalance);
+        let b1 = new BN(balanceBefore);
+        let b2 = new BN(balanceAfter);
         assert.equal(b2.cmp(b1), 1);
     });
 
     // Test revert case
     it('Item could not be shipped', async () => {
         await assertRevert(agora.ship(tokenId, buyer, logisticsNo, { from: seller }));
-    })
+    });
 
     it('Item could not be delivered', async () => {
         await assertRevert(agora.deliver(tokenId, buyer));
-    })
+    });
 
     it('Seller was unable to settle the transaction', async () => {
         await assertRevert(agora.settle(tokenId, buyer, { from: seller }));
-    })
+    });
 })

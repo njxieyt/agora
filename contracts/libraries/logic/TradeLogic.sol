@@ -115,17 +115,18 @@ library TradeLogic {
     function deliverProcess(
         uint256 tokenId,
         address to,
+        Merchandise mToken,
         ILogisticsLookup logisticsLookup,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
             storage logisticsInfo
     ) external {
-        mapping(address => AgoraStorage.Logistics)
-            storage logisticsOfToken = logisticsInfo[tokenId];
-        uint16 amount = logisticsOfToken[to].amount;
+        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
+
+        uint16 amount = logistics.amount;
         require(amount > 0, Errors.NO_ORDER);
 
         // Lookup logistics state
-        string memory logisticsNo = logisticsOfToken[to].logisticsNo;
+        string memory logisticsNo = logistics.logisticsNo;
         require(
             bytes(logisticsNo).length > 0 &&
                 logisticsLookup.getLogisticsState(logisticsNo) ==
@@ -133,8 +134,15 @@ library TradeLogic {
             Errors.ORDER_UNCOMPLETED
         );
 
+        // Check item amount
+        uint256 amountOfToken = mToken.balanceOf(logistics.seller, tokenId);
+        require(amountOfToken >= amount, Errors.INSUFFICIENT_AMOUNT);
+
+        // Transfer mToken to buyer
+        mToken.safeTransferFrom(logistics.seller, to, tokenId, amount, "");
+
         // Update logistics info
-        logisticsOfToken[to].completeTime = block.number;
+        logistics.completeTime = block.number;
     }
 
     /**
@@ -143,7 +151,6 @@ library TradeLogic {
     function settleProcess(
         uint256 tokenId,
         address to,
-        Merchandise mToken,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
             storage logisticsInfo,
         uint256 returnPeriod
@@ -171,13 +178,6 @@ library TradeLogic {
             logistics.seller == seller,
             Errors.CALLER_NOT_THE_OWNER_OF_THE_ITEM
         );
-
-        // Check item amount
-        uint256 amountOfToken = mToken.balanceOf(seller, tokenId);
-        require(amountOfToken >= amount, Errors.INSUFFICIENT_AMOUNT);
-
-        // Transfer mToken to buyer
-        mToken.safeTransferFrom(seller, to, tokenId, amount, "");
 
         // Send ETH to seller
         seller.transfer(logistics.price * amount);

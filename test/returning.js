@@ -1,3 +1,4 @@
+const BN = require('bn.js');
 const Agora = artifacts.require('Agora');
 const Merchandise = artifacts.require('Merchandise');
 const Calculate = artifacts.require('Calculate');
@@ -32,6 +33,8 @@ contract('Returning', (accounts) => {
         await merchandise.transferOwnership(agora.address);
         // Seller approval to management items
         await merchandise.setApprovalForAll(agora.address, true, { from: seller });
+        // Buyer approval to management items
+        await merchandise.setApprovalForAll(agora.address, true, { from: buyer });
         // Set the state of the seller's item to be delivered
         logisticsLookup.setLogisticsState(web3.utils.keccak256(logisticsNo), '2');
         // Set the state of the buyer's returned item to be delivered
@@ -79,7 +82,7 @@ contract('Returning', (accounts) => {
         assert.notEqual(logisticsInfo.completeTime.toString(), '0');
     });
 
-    it('Buyer wants to return the item', async () => {
+    it('Buyer wants to return an item', async () => {
         // Set item back
         await agora.returning(tokenId, '1', logisticsNoReturned, shippingAddressHash, { from: buyer });
 
@@ -89,8 +92,13 @@ contract('Returning', (accounts) => {
     });
 
     it('Buyer confirms item delivered', async () => {
+        // Seller
+        const amountBefore = await merchandise.balanceOf(seller, tokenId);
         // Set item delivered
         await agora.deliver(tokenId, seller);
+        // Check Buyer returned items
+        const amountAfter = await merchandise.balanceOf(seller, tokenId);
+        assert.equal(amountBefore.add(new BN(1)).toString(), amountAfter.toString());
         // Check logistics info
         const logisticsInfo = await agora.logisticsInfo(tokenId, buyer);
         assert.notEqual(logisticsInfo.completeTime.toString(), '0');
@@ -103,13 +111,12 @@ contract('Returning', (accounts) => {
     });
 
     it('Buyer settle a transaction', async () => {
-        // Seller
-        const amountBefore = await merchandise.balanceOf(seller, tokenId);
-
+        const balanceBefore = await web3.eth.getBalance(buyer);
         await agora.settle(tokenId, seller, { from: buyer });
-
-        // Check Buyer returned items
-        const amountAfter = await merchandise.balanceOf(seller, tokenId);
-        assert.equal(amountBefore.add(new BN(1)).toString(), amountAfter.toString());
+        const balanceAfter = await web3.eth.getBalance(buyer);
+        
+        let b1 = new BN(balanceBefore);
+        let b2 = new BN(balanceAfter);
+        assert.equal(b2.cmp(b1), 1);
     });
 })
