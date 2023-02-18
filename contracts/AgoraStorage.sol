@@ -42,6 +42,8 @@ abstract contract AgoraStorage {
     mapping(uint256 => mapping(address => Logistics)) public logisticsInfo;
     struct Logistics {
         uint16 amount;
+        // Seller becomes Buyer when returning
+        address seller;
         // Price at time of purchase
         uint256 price;
         string logisticsNo;

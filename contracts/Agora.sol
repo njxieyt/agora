@@ -95,19 +95,18 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         TradeLogic.refundProcess(tokenId, logisticsInfo);
     }
 
-    function returnMerchandise(
+    function returning(
         uint256 tokenId,
         uint16 amount,
         string calldata logisticsNo,
         bytes32 deliveryAddress
     ) external {
-        TradeLogic.returnMerchandiseProcess(
+        TradeLogic.returningProcess(
             tokenId,
             amount,
             logisticsNo,
             deliveryAddress,
             logisticsInfo,
-            merchandiseInfo,
             returnPeriod
         );
     }

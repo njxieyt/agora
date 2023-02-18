@@ -71,6 +71,7 @@ library TradeLogic {
 
         // Add new logisticsInfo
         AgoraStorage.Logistics memory logistics;
+        logistics.seller = merchandiseInfo[tokenId].seller;
         logistics.amount = amount;
         logistics.deliveryAddress = deliveryAddress;
         logistics.orderTime = block.number;
@@ -94,6 +95,9 @@ library TradeLogic {
         AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
         // Valid order
         require(logistics.orderTime > 0, Errors.NO_ORDER);
+
+        // Buyer has not requested a refund or returned the item
+        require(logistics.returnTime == 0, Errors.ORDER_CANCELED);
 
         // Is owner of tokenId
         uint256 amount = mToken.balanceOf(msg.sender, tokenId);
@@ -123,7 +127,8 @@ library TradeLogic {
         // Lookup logistics state
         string memory logisticsNo = logisticsOfToken[to].logisticsNo;
         require(
-            logisticsLookup.getLogisticsState(logisticsNo) ==
+            bytes(logisticsNo).length > 0 &&
+                logisticsLookup.getLogisticsState(logisticsNo) ==
                 States.LOGISTICS_DELIVERED,
             Errors.ORDER_UNCOMPLETED
         );
@@ -147,22 +152,29 @@ library TradeLogic {
         uint16 amount = logistics.amount;
         require(amount > 0, Errors.NO_ORDER);
 
-        // Is complete time more then 7 days
-        require(
-            block.number > logistics.completeTime + returnPeriod,
-            Errors.NOT_ENOUGH_TIME
-        );
-
         // Is returned
         require(logistics.returnTime == 0, Errors.MERCHANDISE_RETURNED);
 
-        // Settlement partner cannot be oneself
-        require(msg.sender != to, Errors.SETTLEMENT_PARTNER_IS_ONESELF);
+        // Is complete time more then 7 days
+        require(
+            logistics.completeTime > 0 &&
+                (block.number > logistics.completeTime + returnPeriod),
+            Errors.NOT_ENOUGH_TIME
+        );
 
-        // Is owner of tokenId
-        uint256 amountOfToken = mToken.balanceOf(msg.sender, tokenId);
-        require(amountOfToken >= amount, Errors.INSUFFICIENT_AMOUNT);
         address payable seller = payable(msg.sender);
+        // Settlement partner cannot be oneself
+        require(seller != to, Errors.SETTLEMENT_PARTNER_IS_ONESELF);
+
+        // Check if the caller owns the item
+        require(
+            logistics.seller == seller,
+            Errors.CALLER_NOT_THE_OWNER_OF_THE_ITEM
+        );
+
+        // Check item amount
+        uint256 amountOfToken = mToken.balanceOf(seller, tokenId);
+        require(amountOfToken >= amount, Errors.INSUFFICIENT_AMOUNT);
 
         // Transfer mToken to buyer
         mToken.safeTransferFrom(seller, to, tokenId, amount, "");
@@ -202,32 +214,42 @@ library TradeLogic {
         payable(seller).transfer(tokenOfMerchandise.margin - realTimeMargin);
     }
 
+    /**
+        Allow user to request refund if goods have not yet been shipped
+     */
     function refundProcess(
         uint256 tokenId,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
             storage logisticsInfo
     ) external {
-        mapping(address => AgoraStorage.Logistics)
-            storage logisticsOfToken = logisticsInfo[tokenId];
         address buyer = msg.sender;
-        require(logisticsOfToken[buyer].amount > 0, Errors.NO_ORDER);
+        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][
+            buyer
+        ];
 
+        // Valid order
+        require(logistics.amount > 0, Errors.NO_ORDER);
+
+        // Seller has not shipped the item
         require(
-            bytes(logisticsOfToken[buyer].logisticsNo).length < 1,
+            bytes(logistics.logisticsNo).length < 1,
             Errors.LOGISTICS_PROCESSED
         );
 
-        payable(msg.sender).transfer(logisticsOfToken[buyer].price);
+        // Update logisticsInfo
+        logistics.returnTime = block.number;
+
+        // Transfer
+        payable(msg.sender).transfer(logistics.price * logistics.amount);
     }
 
-    function returnMerchandiseProcess(
+    function returningProcess(
         uint256 tokenId,
         uint16 amount,
         string calldata logisticsNo,
         bytes32 deliveryAddress,
         mapping(uint256 => mapping(address => AgoraStorage.Logistics))
             storage logisticsInfo,
-        mapping(uint256 => AgoraStorage.MerchandiseInfo) storage merchandiseInfo,
         uint256 returnPeriod
     ) external {
         AgoraStorage.Logistics storage buyerLogistics = logisticsInfo[tokenId][
@@ -238,23 +260,23 @@ library TradeLogic {
 
         // Check if expired, complete time less than 7 days
         require(
-            block.number <=
-                buyerLogistics.completeTime + returnPeriod,
+            block.number <= buyerLogistics.completeTime + returnPeriod,
             Errors.RETURN_TIME_EXPIRED
         );
 
         // Check return amount
-        require(buyerLogistics.amount > amount, Errors.AMOUNT_EXCEEDED);
+        require(buyerLogistics.amount >= amount, Errors.AMOUNT_EXCEEDED);
 
         // Update logisticsInfo
         buyerLogistics.returnTime = block.number;
         // Add new logisticsInfo,buyer->seller
         AgoraStorage.Logistics memory logistics;
+        logistics.seller = msg.sender;
         logistics.amount = amount;
         logistics.logisticsNo = logisticsNo;
         logistics.deliveryAddress = deliveryAddress;
         logistics.orderTime = block.number;
         logistics.price = buyerLogistics.price;
-        logisticsInfo[tokenId][merchandiseInfo[tokenId].seller] = logistics;
+        logisticsInfo[tokenId][buyerLogistics.seller] = logistics;
     }
 }

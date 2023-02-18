@@ -17,4 +17,6 @@ library Errors {
     string public constant MERCHANDISE_RETURNED = '13';
     string public constant INSUFFICIENT_AMOUNT = '14';
     string public constant SETTLEMENT_PARTNER_IS_ONESELF = '15';
+    string public constant ORDER_CANCELED = '16';
+    string public constant CALLER_NOT_THE_OWNER_OF_THE_ITEM = '17';
 }

@@ -4,7 +4,7 @@ const Calculate = artifacts.require('Calculate');
 const ILogisticsLookup = artifacts.require('ILogisticsLookup');
 const ILogisticsLookupAddress = '0xfb14c19cd86bc7e2c7fce9c3701ab69aa1f058c5';
 
-contract('Agora', (accounts) => {
+contract('Returning', (accounts) => {
     let agora;
     let merchandise;
     let calculate;
@@ -19,6 +19,9 @@ contract('Agora', (accounts) => {
     const amount = 2;
     const uintPrice = 1.2;
     const logisticsNo = '1Z222E910320176644';
+    const logisticsNoReturned = '1Z136E761028174156';
+    const shippingAddress = '9999 Columbia Rd NW #999, Washington, DC 20009';
+    const shippingAddressHash = web3.utils.keccak256(shippingAddress);
 
     before('Get contract instance', async () => {
         agora = await Agora.new();
@@ -29,48 +32,15 @@ contract('Agora', (accounts) => {
         await merchandise.transferOwnership(agora.address);
         // Seller approval to management items
         await merchandise.setApprovalForAll(agora.address, true, { from: seller });
-        // Set item logistics state to delivered
+        // Set the state of the seller's item to be delivered
         logisticsLookup.setLogisticsState(web3.utils.keccak256(logisticsNo), '2');
+        // Set the state of the buyer's returned item to be delivered
+        logisticsLookup.setLogisticsState(web3.utils.keccak256(logisticsNoReturned), '2');
     });
 
     it('Initialize', async () => {
         await agora.initialize(merchandise.address, logisticsLookup.address);
     });
-
-    it('Set margin rate', async () => {
-        // Set rate to 20%
-        let rate = 20 * 10 ** decimals;
-        await agora.setMarginRate(rate.toString());
-        const marginRate = await agora.getMarginRate();
-        assert.equal(marginRate.toString(), rate);
-    });
-
-    it('Set fee rate', async () => {
-        // Set rate to 0.2%
-        let rate = 0.2 * 10 ** decimals;
-        await agora.setFeeRate(rate.toString());
-        const feeRate = await agora.getFeeRate();
-        assert.equal(feeRate.toString(), rate.toString());
-    });
-
-    it('Set return period to 0 days', async () => {
-        await agora.setReturnPeriod('0');
-        const blocknumber = await agora.getReturnPeriod();
-        assert.equal(blocknumber.toString(), '0');
-    })
-
-    it('Calculate margin price', async () => {
-        let marginPrice, fee;
-        let totalPrice = amount * uintPrice;
-        const marginRate = await agora.getMarginRate();
-        const feeRate = await agora.getFeeRate();
-        await calculate.marginPrice(web3.utils.toWei(totalPrice.toString()), marginRate, feeRate).then((res) => {
-            marginPrice = res[0];
-            fee = res[1];
-        });
-        assert.equal((totalPrice * marginRate / 10000), web3.utils.fromWei(marginPrice));
-        assert.equal((totalPrice * feeRate / 10000), web3.utils.fromWei(fee));
-    })
 
     it('Sell two items for 1.2 ether each', async () => {
         const totalPrice = amount * uintPrice;
@@ -88,8 +58,6 @@ contract('Agora', (accounts) => {
     });
 
     it('Buy one item', async () => {
-        const shippingAddress = '9999 Columbia Rd NW #999, Washington, DC 20009';
-        const shippingAddressHash = web3.utils.keccak256(shippingAddress);
         await agora.buy(tokenId, '1', shippingAddressHash,
             { from: buyer, value: web3.utils.toWei(uintPrice.toString()) });
         const logisticsInfo = await agora.logisticsInfo(tokenId, buyer);
@@ -101,7 +69,7 @@ contract('Agora', (accounts) => {
         // Check logistics info
         const logisticsInfo = await agora.logisticsInfo(tokenId, buyer);
         assert.equal(logisticsInfo.logisticsNo, logisticsNo);
-    })
+    });
 
     it('Item was delivered', async () => {
         // Set item delivered
@@ -109,12 +77,39 @@ contract('Agora', (accounts) => {
         // Check logistics info
         const logisticsInfo = await agora.logisticsInfo(tokenId, buyer);
         assert.notEqual(logisticsInfo.completeTime.toString(), '0');
-    })
+    });
 
-    it('Seller settle a transaction', async () => {
-        await agora.settle(tokenId, buyer, { from: seller });
-        // Check buyer owns an item
-        const amountToken = await merchandise.balanceOf(buyer, tokenId);
-        assert.equal(amountToken.toString(), '1');
-    })
+    it('Buyer wants to return the item', async () => {
+        // Set item back
+        await agora.returning(tokenId, '1', logisticsNoReturned, shippingAddressHash, { from: buyer });
+
+        // Check logistics info
+        const logisticsInfo = await agora.logisticsInfo(tokenId, seller);
+        assert(logisticsInfo.seller.toString(), buyer);
+    });
+
+    it('Buyer confirms item delivered', async () => {
+        // Set item delivered
+        await agora.deliver(tokenId, seller);
+        // Check logistics info
+        const logisticsInfo = await agora.logisticsInfo(tokenId, buyer);
+        assert.notEqual(logisticsInfo.completeTime.toString(), '0');
+    });
+
+    it('Set return period to 0 days', async () => {
+        await agora.setReturnPeriod('0');
+        const blocknumber = await agora.getReturnPeriod();
+        assert.equal(blocknumber.toString(), '0');
+    });
+
+    it('Buyer settle a transaction', async () => {
+        // Seller
+        const amountBefore = await merchandise.balanceOf(seller, tokenId);
+
+        await agora.settle(tokenId, seller, { from: buyer });
+
+        // Check Buyer returned items
+        const amountAfter = await merchandise.balanceOf(seller, tokenId);
+        assert.equal(amountBefore.add(new BN(1)).toString(), amountAfter.toString());
+    });
 })
