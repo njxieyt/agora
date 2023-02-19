@@ -125,7 +125,7 @@ contract('Buy', (accounts) => {
         assert.equal(b2.cmp(b1), 1);
     });
 
-    it('Seller release margin', async () => {
+    it('Seller release the margin', async () => {
         const balanceBefore = await web3.eth.getBalance(seller);
         await agora.releaseMargin(tokenId, { from: seller });
         const balanceAfter = await web3.eth.getBalance(seller);

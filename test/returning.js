@@ -114,7 +114,7 @@ contract('Returning', (accounts) => {
         const balanceBefore = await web3.eth.getBalance(buyer);
         await agora.settle(tokenId, seller, { from: buyer });
         const balanceAfter = await web3.eth.getBalance(buyer);
-        
+
         let b1 = new BN(balanceBefore);
         let b2 = new BN(balanceAfter);
         assert.equal(b2.cmp(b1), 1);
