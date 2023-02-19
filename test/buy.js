@@ -124,4 +124,14 @@ contract('Buy', (accounts) => {
         let b2 = new BN(balanceAfter);
         assert.equal(b2.cmp(b1), 1);
     });
+
+    it('Seller release margin', async () => {
+        const balanceBefore = await web3.eth.getBalance(seller);
+        await agora.releaseMargin(tokenId, { from: seller });
+        const balanceAfter = await web3.eth.getBalance(seller);
+
+        let b1 = new BN(balanceBefore);
+        let b2 = new BN(balanceAfter);
+        assert.equal(b2.cmp(b1), 1);
+    });
 })

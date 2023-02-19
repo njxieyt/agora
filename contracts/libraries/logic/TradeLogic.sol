@@ -33,6 +33,8 @@ library TradeLogic {
     ) external {
         require(bytes(newUri).length > 0, Errors.URI_NOT_DEFINED);
 
+        require(price > 0, Errors.INVALID_PRICE);
+
         // Get margin amount & fee
         AgoraStorage.UserInfo storage userInfo = users[msg.sender];
         (uint256 margin, uint256 fee) = Calculate.marginPrice(
@@ -64,7 +66,7 @@ library TradeLogic {
             storage logisticsInfo
     ) external {
         // Amount must be greater than 0'
-        require(amount != 0, Errors.INVALID_AMOUNT);
+        require(amount > 0, Errors.INVALID_AMOUNT);
         // Is enough price
         uint256 price = merchandiseInfo[tokenId].price;
         require(msg.value >= price * amount, Errors.NOT_ENOUGH_ETH);
