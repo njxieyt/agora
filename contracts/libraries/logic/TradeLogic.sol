@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.17;
-import "../../Merchandise.sol";
+import {Merchandise} from "../../Merchandise.sol";
 import {Errors} from "../constant/Errors.sol";
 import {States} from "../constant/States.sol";
 import {DataTypes} from "../types/DataTypes.sol";
 import {Calculate} from "../utils/Calculate.sol";
-import {AgoraStorage} from "../../AgoraStorage.sol";
 import {ILogisticsLookup} from "../../interfaces/ILogisticsLookup.sol";
 
 library TradeLogic {
@@ -83,15 +82,14 @@ library TradeLogic {
     function sellProcess(
         DataTypes.SellParams memory sellParams,
         Merchandise mToken,
-        mapping(uint256 => AgoraStorage.MerchandiseInfo)
-            storage merchandiseInfo,
-        mapping(address => AgoraStorage.UserInfo) storage users,
-        AgoraStorage.FeeInfo storage feeInfo
+        mapping(uint256 => DataTypes.MerchandiseInfo) storage merchandiseInfo,
+        mapping(address => DataTypes.UserInfo) storage users,
+        DataTypes.FeeInfo storage feeInfo
     ) external {
         require(bytes(sellParams.newUri).length > 0, Errors.URI_NOT_DEFINED);
         require(sellParams.price > 0, Errors.INVALID_PRICE);
         // Get the caller's margin and fees
-        AgoraStorage.UserInfo storage userInfo = users[msg.sender];
+        DataTypes.UserInfo storage userInfo = users[msg.sender];
         (uint256 margin, uint256 fee) = Calculate.marginPrice(
             sellParams.price * sellParams.amount,
             userInfo.marginRate == 0
@@ -134,9 +132,8 @@ library TradeLogic {
         uint256 tokenId,
         uint16 amount,
         bytes32 deliveryAddress,
-        mapping(uint256 => AgoraStorage.MerchandiseInfo)
-            storage merchandiseInfo,
-        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+        mapping(uint256 => DataTypes.MerchandiseInfo) storage merchandiseInfo,
+        mapping(uint256 => mapping(address => DataTypes.Logistics))
             storage logisticsInfo
     ) external {
         require(amount > 0, Errors.INVALID_AMOUNT);
@@ -144,7 +141,7 @@ library TradeLogic {
         require(msg.value >= price * amount, Errors.NOT_ENOUGH_ETH);
 
         // Add new logistics info
-        AgoraStorage.Logistics memory logistics;
+        DataTypes.Logistics memory logistics;
         logistics.seller = merchandiseInfo[tokenId].seller;
         logistics.amount = amount;
         logistics.deliveryAddress = deliveryAddress;
@@ -168,10 +165,10 @@ library TradeLogic {
         address to,
         string calldata logisticsNo,
         Merchandise mToken,
-        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+        mapping(uint256 => mapping(address => DataTypes.Logistics))
             storage logisticsInfo
     ) external {
-        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
+        DataTypes.Logistics storage logistics = logisticsInfo[tokenId][to];
         // There is an order
         require(logistics.orderTime > 0, Errors.NO_ORDER);
         // Buyer has not requested a refund or returned the goods
@@ -202,10 +199,10 @@ library TradeLogic {
         address to,
         Merchandise mToken,
         ILogisticsLookup logisticsLookup,
-        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+        mapping(uint256 => mapping(address => DataTypes.Logistics))
             storage logisticsInfo
     ) external {
-        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
+        DataTypes.Logistics storage logistics = logisticsInfo[tokenId][to];
         uint16 amount = logistics.amount;
         // Check order amount
         require(amount > 0, Errors.NO_ORDER);
@@ -240,11 +237,11 @@ library TradeLogic {
     function settleProcess(
         uint256 tokenId,
         address to,
-        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+        mapping(uint256 => mapping(address => DataTypes.Logistics))
             storage logisticsInfo,
         uint256 returnPeriod
     ) external {
-        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][to];
+        DataTypes.Logistics storage logistics = logisticsInfo[tokenId][to];
         uint16 amount = logistics.amount;
         // Check order amount
         require(amount > 0, Errors.NO_ORDER);
@@ -282,16 +279,16 @@ library TradeLogic {
         uint16 marginRate,
         uint16 feeRate,
         Merchandise mToken,
-        mapping(uint256 => AgoraStorage.MerchandiseInfo)
-            storage merchandiseInfo,
-        mapping(address => AgoraStorage.UserInfo) storage users
+        mapping(uint256 => DataTypes.MerchandiseInfo) storage merchandiseInfo,
+        mapping(address => DataTypes.UserInfo) storage users
     ) external {
-        AgoraStorage.MerchandiseInfo
-            storage tokenOfMerchandise = merchandiseInfo[tokenId];
+        DataTypes.MerchandiseInfo storage tokenOfMerchandise = merchandiseInfo[
+            tokenId
+        ];
         address seller = tokenOfMerchandise.seller;
         // The caller owns the goods
         require(msg.sender == seller, Errors.CALLER_NOT_THE_OWNER);
-        AgoraStorage.UserInfo storage userInfo = users[seller];
+        DataTypes.UserInfo storage userInfo = users[seller];
         (uint256 realTimeMargin, ) = Calculate.marginPrice(
             tokenOfMerchandise.price * mToken.balanceOf(seller, tokenId),
             userInfo.marginRate == 0 ? marginRate : userInfo.marginRate,
@@ -316,13 +313,11 @@ library TradeLogic {
      */
     function refundProcess(
         uint256 tokenId,
-        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+        mapping(uint256 => mapping(address => DataTypes.Logistics))
             storage logisticsInfo
     ) external {
         address buyer = msg.sender;
-        AgoraStorage.Logistics storage logistics = logisticsInfo[tokenId][
-            buyer
-        ];
+        DataTypes.Logistics storage logistics = logisticsInfo[tokenId][buyer];
         // There is an order
         require(logistics.amount > 0, Errors.NO_ORDER);
         // the seller has not shipped the goods
@@ -354,12 +349,12 @@ library TradeLogic {
         uint16 amount,
         string calldata logisticsNo,
         bytes32 deliveryAddress,
-        mapping(uint256 => mapping(address => AgoraStorage.Logistics))
+        mapping(uint256 => mapping(address => DataTypes.Logistics))
             storage logisticsInfo,
         uint256 returnPeriod
     ) external {
         address buyer = msg.sender;
-        AgoraStorage.Logistics storage buyerLogistics = logisticsInfo[tokenId][
+        DataTypes.Logistics storage buyerLogistics = logisticsInfo[tokenId][
             buyer
         ];
         // The order has been completed
@@ -379,7 +374,7 @@ library TradeLogic {
         buyerLogistics.returnTime = block.number;
 
         // Add new logistics info(buyer->seller)
-        AgoraStorage.Logistics memory logistics;
+        DataTypes.Logistics memory logistics;
         logistics.seller = buyer;
         logistics.amount = amount;
         logistics.logisticsNo = logisticsNo;
@@ -397,7 +392,7 @@ library TradeLogic {
      */
     function claimProcess(
         uint256 amount,
-        AgoraStorage.FeeInfo storage feeInfo
+        DataTypes.FeeInfo storage feeInfo
     ) external {
         require(
             feeInfo.rewarded > feeInfo.claimed &&

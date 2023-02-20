@@ -22,7 +22,7 @@ contract('Returning', (accounts) => {
         merchandise = await Merchandise.new();
         calculate = await Calculate.new();
         logisticsLookup = await LogisticsLookup.deployed();
-        // Set owner of Merchandise is Agora contract
+        // The merchandise is owned by agora contract
         await merchandise.transferOwnership(agora.address);
         // Seller approval to management items
         await merchandise.setApprovalForAll(agora.address, true, { from: seller });

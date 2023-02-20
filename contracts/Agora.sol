@@ -1,18 +1,17 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
-import "./AgoraStorage.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Merchandise} from "./Merchandise.sol";
+import {ILogisticsLookup} from "./interfaces/ILogisticsLookup.sol";
+import {AgoraStorage} from "./AgoraStorage.sol";
 import {TradeLogic} from "./libraries/logic/TradeLogic.sol";
 import {DataTypes} from "./libraries/types/DataTypes.sol";
 import {Errors} from "./libraries/constant/Errors.sol";
 import {States} from "./libraries/constant/States.sol";
 
 contract Agora is AgoraStorage, Initializable, Ownable {
-    using SafeMath for uint256;
-
     function initialize(
         Merchandise merchandise,
         ILogisticsLookup lookup
