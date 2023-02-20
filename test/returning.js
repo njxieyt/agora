@@ -89,7 +89,7 @@ contract('Returning', (accounts) => {
         const amountBefore = await merchandise.balanceOf(seller, tokenId);
         // Set item delivered
         await agora.deliver(tokenId, seller);
-        // Check Buyer returned items
+        // Check the buyer returned items
         const amountAfter = await merchandise.balanceOf(seller, tokenId);
         assert.equal(amountBefore.add(new BN(1)).toString(), amountAfter.toString());
         // Check logistics info
