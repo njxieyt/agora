@@ -1,10 +1,5 @@
-const BN = require('bn.js');
 const { assertRevert } = require('./utils/assert-revert');
-const Agora = artifacts.require('Agora');
-const Merchandise = artifacts.require('Merchandise');
-const Calculate = artifacts.require('Calculate');
-const ILogisticsLookup = artifacts.require('ILogisticsLookup');
-const ILogisticsLookupAddress = '0xfb14c19cd86bc7e2c7fce9c3701ab69aa1f058c5';
+const { BN, Agora, Merchandise, Calculate, LogisticsLookup } = require('./utils/base.js');
 
 contract('Refund', (accounts) => {
     let agora;
@@ -26,7 +21,7 @@ contract('Refund', (accounts) => {
         agora = await Agora.new();
         merchandise = await Merchandise.new();
         calculate = await Calculate.new();
-        logisticsLookup = await ILogisticsLookup.at(ILogisticsLookupAddress);
+        logisticsLookup = await LogisticsLookup.deployed();
         // Set owner of Merchandise is Agora contract
         await merchandise.transferOwnership(agora.address);
         // Seller approval to management items
@@ -78,7 +73,7 @@ contract('Refund', (accounts) => {
         assert.equal(b2.cmp(b1), 1);
     });
 
-    // Test revert case
+    // Test case revert
     it('Item could not be shipped', async () => {
         await assertRevert(agora.ship(tokenId, buyer, logisticsNo, { from: seller }));
     });

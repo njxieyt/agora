@@ -42,6 +42,39 @@ library TradeLogic {
     event deliver(uint256 indexed tokenId, address indexed buyer);
 
     /**
+     * @notice Let the recipient know that the order is done
+     * @param tokenId The identifier of a merchandise
+     * @param shipper The owner of the goods, can be either the seller when selling or the buyer when returning
+     * @param recipient The recipient of goods
+     */
+    event settle(
+        uint256 indexed tokenId,
+        address indexed shipper,
+        address recipient
+    );
+
+    /**
+     * @notice Record the margin was released
+     * @param tokenId The identifier of a merchandise
+     * @param seller The owner of the margin
+     */
+    event releaseMargin(uint256 indexed tokenId, address seller);
+
+    /**
+     * @notice Notify the seller that the buyer has a refund
+     * @param tokenId The identifier of a merchandise
+     * @param buyer The purchaser of goods
+     */
+    event refund(uint256 indexed tokenId, address buyer);
+
+    /**
+     * @notice Inform the seller that the buyer returned the goods
+     * @param tokenId The identifier of a merchandise
+     * @param buyer The purchaser of goods
+     */
+    event returning(uint256 indexed tokenId, address buyer);
+
+    /**
      * @notice Seller sells the goods
      * @param tokenId The identifier of a merchandise
      * @param price The cost of a merchandise
@@ -223,14 +256,16 @@ library TradeLogic {
                 (block.number > logistics.completeTime + returnPeriod),
             Errors.NOT_ENOUGH_TIME
         );
-        address payable seller = payable(msg.sender);
+        address payable shipper = payable(msg.sender);
         // Settlement partner cannot be oneself
-        require(seller != to, Errors.SETTLEMENT_PARTNER_IS_ONESELF);
+        require(shipper != to, Errors.SETTLEMENT_PARTNER_IS_ONESELF);
         // The caller owns the goods
-        require(logistics.seller == seller, Errors.CALLER_NOT_THE_OWNER);
+        require(logistics.seller == shipper, Errors.CALLER_NOT_THE_OWNER);
 
         // Transfer ETH to caller
-        seller.transfer(logistics.price * amount);
+        shipper.transfer(logistics.price * amount);
+
+        emit settle(tokenId, shipper, to);
     }
 
     /**
@@ -270,6 +305,8 @@ library TradeLogic {
 
         // Transfer excess margin
         payable(seller).transfer(tokenOfMerchandise.margin - realTimeMargin);
+
+        emit releaseMargin(tokenId, seller);
     }
 
     /**
@@ -299,6 +336,8 @@ library TradeLogic {
 
         // Transfer ETH to caller
         payable(msg.sender).transfer(logistics.price * logistics.amount);
+
+        emit refund(tokenId, buyer);
     }
 
     /**
@@ -319,8 +358,9 @@ library TradeLogic {
             storage logisticsInfo,
         uint256 returnPeriod
     ) external {
+        address buyer = msg.sender;
         AgoraStorage.Logistics storage buyerLogistics = logisticsInfo[tokenId][
-            msg.sender
+            buyer
         ];
         // The order has been completed
         require(buyerLogistics.completeTime > 0, Errors.ORDER_UNCOMPLETED);
@@ -340,12 +380,14 @@ library TradeLogic {
 
         // Add new logistics info(buyer->seller)
         AgoraStorage.Logistics memory logistics;
-        logistics.seller = msg.sender;
+        logistics.seller = buyer;
         logistics.amount = amount;
         logistics.logisticsNo = logisticsNo;
         logistics.deliveryAddress = deliveryAddress;
         logistics.orderTime = block.number;
         logistics.price = buyerLogistics.price;
         logisticsInfo[tokenId][buyerLogistics.seller] = logistics;
+
+        emit returning(tokenId, buyer);
     }
 }

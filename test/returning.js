@@ -1,9 +1,4 @@
-const BN = require('bn.js');
-const Agora = artifacts.require('Agora');
-const Merchandise = artifacts.require('Merchandise');
-const Calculate = artifacts.require('Calculate');
-const ILogisticsLookup = artifacts.require('ILogisticsLookup');
-const ILogisticsLookupAddress = '0xfb14c19cd86bc7e2c7fce9c3701ab69aa1f058c5';
+const { BN, Agora, Merchandise, Calculate, LogisticsLookup } = require('./utils/base.js');
 
 contract('Returning', (accounts) => {
     let agora;
@@ -11,12 +6,10 @@ contract('Returning', (accounts) => {
     let calculate;
     let logisticsLookup;
 
-    const deployer = accounts[0];
     const seller = accounts[1];
     const buyer = accounts[2];
 
     const tokenId = '1';
-    const decimals = 2;
     const amount = 2;
     const uintPrice = 1.2;
     const logisticsNo = '1Z222E910320176644';
@@ -28,7 +21,7 @@ contract('Returning', (accounts) => {
         agora = await Agora.new();
         merchandise = await Merchandise.new();
         calculate = await Calculate.new();
-        logisticsLookup = await ILogisticsLookup.at(ILogisticsLookupAddress);
+        logisticsLookup = await LogisticsLookup.deployed();
         // Set owner of Merchandise is Agora contract
         await merchandise.transferOwnership(agora.address);
         // Seller approval to management items

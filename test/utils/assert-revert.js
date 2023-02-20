@@ -10,5 +10,5 @@ async function assertRevert(promise) {
 }
 
 module.exports = {
-	assertRevert,
+	assertRevert
 };

@@ -12,10 +12,10 @@ import {States} from "./libraries/constant/States.sol";
 contract Agora is AgoraStorage, Initializable, Ownable {
     using SafeMath for uint256;
 
-    function initialize(Merchandise merchandise, ILogisticsLookup lookup)
-        public
-        initializer
-    {
+    function initialize(
+        Merchandise merchandise,
+        ILogisticsLookup lookup
+    ) public initializer {
         mToken = merchandise;
         logisticsLookup = lookup;
         // Unit: % with two decimal places(default 10%)
@@ -77,12 +77,7 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     function settle(uint256 tokenId, address to) external {
-        TradeLogic.settleProcess(
-            tokenId,
-            to,
-            logisticsInfo,
-            returnPeriod
-        );
+        TradeLogic.settleProcess(tokenId, to, logisticsInfo, returnPeriod);
     }
 
     function releaseMargin(uint256 tokenId) external {
@@ -117,7 +112,8 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     /**
-        @dev management:setup global margin rate
+     * @notice Set the global margin ratio
+     * @param newMarginRate The margin ratio that the seller needs to pay
      */
     function setMarginRate(uint16 newMarginRate) external onlyOwner {
         marginRate = newMarginRate;
@@ -128,7 +124,8 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     /**
-        @dev management:setup global fee rate
+     * @notice Set the global fee ratio
+     * @param newFeeRate The fee ratio that the seller needs to pay
      */
     function setFeeRate(uint16 newFeeRate) external onlyOwner {
         feeRate = newFeeRate;
@@ -139,12 +136,14 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     /**
-        @dev management:setup margin rate on user
+     * @notice Set the margin ratio to a user
+     * @param user The seller
+     * @param newMarginRate The seller's margin ratio
      */
-    function setUserMarginRate(address user, uint16 newMarginRate)
-        external
-        onlyOwner
-    {
+    function setUserMarginRate(
+        address user,
+        uint16 newMarginRate
+    ) external onlyOwner {
         users[user].marginRate = newMarginRate;
     }
 
@@ -153,12 +152,14 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     /**
-        @dev management:setup fee rate on user
+     * @notice Set the fee ratio to a user
+     * @param user The seller
+     * @param newFeeRate The seller's fee ratio
      */
-    function setUserFeeRate(address user, uint16 newFeeRate)
-        external
-        onlyOwner
-    {
+    function setUserFeeRate(
+        address user,
+        uint16 newFeeRate
+    ) external onlyOwner {
         users[user].feeRate = newFeeRate;
     }
 
@@ -167,7 +168,8 @@ contract Agora is AgoraStorage, Initializable, Ownable {
     }
 
     /**
-        @dev management:Set the return period time
+     * @notice Set a return period for the goods
+     * @param blockNumber Corresponding time
      */
     function setReturnPeriod(uint256 blockNumber) external onlyOwner {
         returnPeriod = blockNumber;
