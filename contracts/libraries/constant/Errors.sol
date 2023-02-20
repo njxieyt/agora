@@ -9,7 +9,7 @@ library Errors {
     string public constant NO_ORDER = "5";
     string public constant ORDER_UNCOMPLETED = "6";
     string public constant MARGIN_BELOW_THRESHOLD = "7";
-    string public constant INVALID_MARGIN_USER = "8";
+    string public constant NOT_ENOUGH_AVAILABLE_FEES = "8";
     string public constant LOGISTICS_PROCESSED = "9";
     string public constant AMOUNT_EXCEEDED = "10";
     string public constant NOT_ENOUGH_TIME = "11";

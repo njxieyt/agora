@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "./AgoraStorage.sol";
 import {TradeLogic} from "./libraries/logic/TradeLogic.sol";
+import {DataTypes} from "./libraries/types/DataTypes.sol";
 import {Errors} from "./libraries/constant/Errors.sol";
 import {States} from "./libraries/constant/States.sol";
 
@@ -32,15 +33,18 @@ contract Agora is AgoraStorage, Initializable, Ownable {
         string calldata newUri
     ) external payable {
         TradeLogic.sellProcess(
-            ++currentTokenId,
-            uintPrice,
-            amount,
-            marginRate,
-            feeRate,
-            newUri,
+            DataTypes.SellParams({
+                tokenId: ++currentTokenId,
+                price: uintPrice,
+                amount: amount,
+                marginRate: marginRate,
+                feeRate: feeRate,
+                newUri: newUri
+            }),
             mToken,
             merchandiseInfo,
-            users
+            users,
+            feeInfo
         );
     }
 
@@ -177,5 +181,13 @@ contract Agora is AgoraStorage, Initializable, Ownable {
 
     function getReturnPeriod() external view returns (uint256) {
         return returnPeriod;
+    }
+
+    /**
+     * @notice Transfer fees
+     * @param amount Claim the amount of fees
+     */
+    function claim(uint256 amount) external onlyOwner {
+        TradeLogic.claimProcess(amount, feeInfo);
     }
 }

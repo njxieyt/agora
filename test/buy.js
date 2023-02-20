@@ -128,4 +128,22 @@ contract('Buy', (accounts) => {
         let b2 = new BN(balanceAfter);
         assert.equal(b2.cmp(b1), 1);
     });
+
+    it('Admin claim fees', async () => {
+        let rewarded, claimed;
+        await agora.feeInfo().then(res => {
+            rewarded = res[0];
+            claimed = res[1];
+        });
+        assert.equal(rewarded.cmp(claimed), 1);
+
+        await agora.claim(rewarded.toString());
+
+        await agora.feeInfo().then(res => {
+            rewarded = res[0];
+            claimed = res[1];
+        });
+        assert.equal(rewarded.cmp(0), 1);
+        assert.equal(claimed.cmp(0), 1);
+    });
 })

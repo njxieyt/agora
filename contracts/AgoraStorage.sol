@@ -13,6 +13,15 @@ abstract contract AgoraStorage {
     uint256 public returnPeriod;
 
     /**
+     * @notice Record the fees' and claims total
+     */
+    FeeInfo public feeInfo;
+    struct FeeInfo {
+        uint256 rewarded;
+        uint256 claimed;
+    }
+
+    /**
      * @notice Map of the user's info
      */
     mapping(address => UserInfo) public users;

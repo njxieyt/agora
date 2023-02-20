@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: BUSL-1.1
 pragma solidity ^0.8.17;
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../../Merchandise.sol";
-import "../constant/Errors.sol";
-import "../constant/States.sol";
+import {Errors} from "../constant/Errors.sol";
+import {States} from "../constant/States.sol";
+import {DataTypes} from "../types/DataTypes.sol";
 import {Calculate} from "../utils/Calculate.sol";
 import {AgoraStorage} from "../../AgoraStorage.sol";
 import {ILogisticsLookup} from "../../interfaces/ILogisticsLookup.sol";
 
 library TradeLogic {
-    using SafeMath for uint256;
-
     /**
      *
      * @param tokenId The identifier of a merchandise
@@ -76,50 +74,52 @@ library TradeLogic {
 
     /**
      * @notice Seller sells the goods
-     * @param tokenId The identifier of a merchandise
-     * @param price The cost of a merchandise
-     * @param amount The sales amount
-     * @param marginRate The margin ratio that the seller needs to pay
-     * @param feeRate The fee ratio that the seller needs to pay
-     * @param newUri The URL of the merchandise's information
+     * @param sellParams See `DataTypes.SellParams`
      * @param mToken Token of merchandise
      * @param merchandiseInfo Basic merchandise information
      * @param users Basic users information
+     * @param feeInfo Record the fees' and claims total
      */
     function sellProcess(
-        uint256 tokenId,
-        uint256 price,
-        uint16 amount,
-        uint16 marginRate,
-        uint16 feeRate,
-        string calldata newUri,
+        DataTypes.SellParams memory sellParams,
         Merchandise mToken,
         mapping(uint256 => AgoraStorage.MerchandiseInfo)
             storage merchandiseInfo,
-        mapping(address => AgoraStorage.UserInfo) storage users
+        mapping(address => AgoraStorage.UserInfo) storage users,
+        AgoraStorage.FeeInfo storage feeInfo
     ) external {
-        require(bytes(newUri).length > 0, Errors.URI_NOT_DEFINED);
-        require(price > 0, Errors.INVALID_PRICE);
+        require(bytes(sellParams.newUri).length > 0, Errors.URI_NOT_DEFINED);
+        require(sellParams.price > 0, Errors.INVALID_PRICE);
         // Get the caller's margin and fees
         AgoraStorage.UserInfo storage userInfo = users[msg.sender];
         (uint256 margin, uint256 fee) = Calculate.marginPrice(
-            price.mul(amount),
-            userInfo.marginRate == 0 ? marginRate : userInfo.marginRate,
-            userInfo.feeRate == 0 ? feeRate : userInfo.feeRate
+            sellParams.price * sellParams.amount,
+            userInfo.marginRate == 0
+                ? sellParams.marginRate
+                : userInfo.marginRate,
+            userInfo.feeRate == 0 ? sellParams.feeRate : userInfo.feeRate
         );
         require(msg.value >= margin + fee, Errors.INSUFFICIENT_MARGIN);
 
+        // Fee rewarded
+        feeInfo.rewarded += fee;
+
         // Margin of the merchandise
-        merchandiseInfo[tokenId].margin += margin;
+        merchandiseInfo[sellParams.tokenId].margin += margin;
         // Price of the merchandise
-        merchandiseInfo[tokenId].price = price;
+        merchandiseInfo[sellParams.tokenId].price = sellParams.price;
         // The seller of the merchandise
-        merchandiseInfo[tokenId].seller = msg.sender;
+        merchandiseInfo[sellParams.tokenId].seller = msg.sender;
 
         // Mint the merchandise's token
-        mToken.mint(msg.sender, tokenId, amount, newUri);
+        mToken.mint(
+            msg.sender,
+            sellParams.tokenId,
+            sellParams.amount,
+            sellParams.newUri
+        );
 
-        emit Sell(tokenId, msg.sender, fee);
+        emit Sell(sellParams.tokenId, msg.sender, fee);
     }
 
     /**
@@ -293,7 +293,7 @@ library TradeLogic {
         require(msg.sender == seller, Errors.CALLER_NOT_THE_OWNER);
         AgoraStorage.UserInfo storage userInfo = users[seller];
         (uint256 realTimeMargin, ) = Calculate.marginPrice(
-            tokenOfMerchandise.price.mul(mToken.balanceOf(seller, tokenId)),
+            tokenOfMerchandise.price * mToken.balanceOf(seller, tokenId),
             userInfo.marginRate == 0 ? marginRate : userInfo.marginRate,
             userInfo.feeRate == 0 ? feeRate : userInfo.feeRate
         );
@@ -389,5 +389,25 @@ library TradeLogic {
         logisticsInfo[tokenId][buyerLogistics.seller] = logistics;
 
         emit returning(tokenId, buyer);
+    }
+
+    /**
+     * @notice Transfer fees
+     * @param amount Claim the amount of fees
+     */
+    function claimProcess(
+        uint256 amount,
+        AgoraStorage.FeeInfo storage feeInfo
+    ) external {
+        require(
+            feeInfo.rewarded > feeInfo.claimed &&
+                (feeInfo.rewarded - feeInfo.claimed) >= amount,
+            Errors.NOT_ENOUGH_AVAILABLE_FEES
+        );
+
+        feeInfo.claimed += amount;
+
+        // Transfer ETH to caller
+        payable(msg.sender).transfer(amount);
     }
 }
