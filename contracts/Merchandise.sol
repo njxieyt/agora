@@ -9,13 +9,9 @@ contract Merchandise is ERC1155, Ownable {
 
     mapping(uint256 => string) public tokenURIs;
 
-    function uri(uint256 tokenId)
-        public
-        view
-        virtual
-        override
-        returns (string memory)
-    {
+    function uri(
+        uint256 tokenId
+    ) public view virtual override returns (string memory) {
         return tokenURIs[tokenId];
     }
 
