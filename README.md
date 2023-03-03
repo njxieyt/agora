@@ -4,6 +4,10 @@
 
 Agora is a blockchain-based e-commerce platform that offers a range of features for buying and selling goods online.
 
+You can visit the following URL to test and experience nightly version.
+
+https://app.agorasea.top/
+
 ## Smart contract
 
 Sell Goods: Sellers can list their products for sale on the platform. 
